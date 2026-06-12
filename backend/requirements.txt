@@ -6,4 +6,8 @@ PyPDF2
 python-docx
 reportlab
 PyJWT
+pytesseract
+pillow
+opencv-python
 gunicorn
+pdfplumber
