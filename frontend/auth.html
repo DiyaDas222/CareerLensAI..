@@ -247,6 +247,13 @@
 
         <button class="btn btn-secondary" onclick="register()">Create Account</button>
 
+        <div style="margin-top: 25px; font-size: 13px;">
+            <a href="#" onclick="toggleApiInput(event)" style="color: var(--text-muted); text-decoration: none; font-weight:600;">⚙️ Configure API Server</a>
+            <div id="apiInputContainer" style="display:none; margin-top:12px;">
+                <input type="text" id="backendUrlInput" placeholder="https://app.onrender.com" style="width: 100%; padding: 10px 14px; font-size: 13px; background: rgba(10, 15, 25, 0.5); border: 1px solid var(--border-color); border-radius: 8px; color: white; outline: none; text-align: center;" onchange="saveBackendUrl(this.value)">
+            </div>
+        </div>
+
         <p id="message"></p>
     </div>
 
@@ -255,6 +262,30 @@
             const msgEl = document.getElementById("message");
             msgEl.innerText = text;
             msgEl.className = isError ? "message-error" : "message-success";
+        }
+
+        function toggleApiInput(e) {
+            e.preventDefault();
+            const el = document.getElementById("apiInputContainer");
+            el.style.display = el.style.display === "none" ? "block" : "none";
+        }
+
+        function saveBackendUrl(url) {
+            if (url) {
+                url = url.trim().replace(/\/$/, "");
+                localStorage.setItem("backend_url", url);
+            } else {
+                localStorage.removeItem("backend_url");
+            }
+        }
+
+        function getApiUrl(path) {
+            const saved = localStorage.getItem("backend_url");
+            if (saved) return saved + path;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return "http://127.0.0.1:5000" + path;
+            }
+            return path;
         }
 
         async function register() {
@@ -267,7 +298,7 @@
             }
 
             try {
-                let response = await fetch("/register", {
+                let response = await fetch(getApiUrl("/register"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username, password })
@@ -299,7 +330,7 @@
             }
 
             try {
-                let response = await fetch("/login", {
+                let response = await fetch(getApiUrl("/login"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username, password })
@@ -330,7 +361,10 @@
             });
         });
 
-        // Clear local storage on load to prevent state leaks
+        // Initialize saved URL on load
+        document.getElementById("backendUrlInput").value = localStorage.getItem("backend_url") || "";
+
+        // Clear local storage username on load to prevent state leaks, but keep backend_url
         localStorage.removeItem("username");
     </script>
 </body>

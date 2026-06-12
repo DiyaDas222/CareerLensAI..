@@ -842,6 +842,11 @@
             <li onclick="switchTab('history', this)">Report History</li>
         </ul>
 
+        <div class="api-config" style="margin-top: 15px; margin-bottom: 15px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; font-size: 13px;">
+            <div style="font-weight:600; margin-bottom:5px; color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">API Backend URL</div>
+            <input type="text" id="backendUrlInput" placeholder="https://app.onrender.com" style="width:100%; padding:6px 10px; font-size:12px; background: rgba(0, 0, 0, 0.3); border:1px solid var(--border-color); border-radius:6px; color:white; outline:none;" onchange="saveBackendUrl(this.value)">
+        </div>
+
         <button class="btn-logout" onclick="logout()">Sign Out</button>
     </div>
 
@@ -1172,12 +1177,31 @@
     </div>
 
     <script>
+        function getApiUrl(path) {
+            const saved = localStorage.getItem("backend_url");
+            if (saved) return saved + path;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return "http://127.0.0.1:5000" + path;
+            }
+            return path;
+        }
+
+        function saveBackendUrl(url) {
+            if (url) {
+                url = url.trim().replace(/\/$/, "");
+                localStorage.setItem("backend_url", url);
+            } else {
+                localStorage.removeItem("backend_url");
+            }
+        }
+
         // Check active session on startup
         const username = localStorage.getItem("username");
         if (!username) {
             window.location.href = "auth.html";
         } else {
             document.getElementById("usernameDisplay").innerText = username;
+            document.getElementById("backendUrlInput").value = localStorage.getItem("backend_url") || "";
         }
 
         function logout() {
@@ -1308,7 +1332,7 @@
             formData.append("username", username);
 
             try {
-                const response = await fetch("/upload", {
+                const response = await fetch(getApiUrl("/upload"), {
                     method: "POST",
                     body: formData
                 });
@@ -1644,7 +1668,7 @@
             showLoading(true, "Evaluating answer response quality...");
 
             try {
-                const response = await fetch("/evaluate-mock-answer", {
+                const response = await fetch(getApiUrl("/evaluate-mock-answer"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1692,7 +1716,7 @@
             showLoading(true, `Drafting tailored cover letter for ${company}...`);
 
             try {
-                const response = await fetch("/generate-cover-letter", {
+                const response = await fetch(getApiUrl("/generate-cover-letter"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1741,7 +1765,7 @@
             showLoading(true, "Auditing LinkedIn branding alignment...");
 
             try {
-                const response = await fetch("/analyze-linkedin", {
+                const response = await fetch(getApiUrl("/analyze-linkedin"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1777,7 +1801,7 @@
             const emptyPlaceholder = document.getElementById("historyEmptyState");
 
             try {
-                const response = await fetch(`/history?username=${username}`);
+                const response = await fetch(getApiUrl(`/history?username=${username}`));
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -1822,7 +1846,7 @@
                 alert("No active report loaded.");
                 return;
             }
-            window.open(`/download-report?report_id=${activeReport.id}&username=${username}`, "_blank");
+            window.open(getApiUrl(`/download-report?report_id=${activeReport.id}&username=${username}`), "_blank");
         }
 
         // Copy utilities
