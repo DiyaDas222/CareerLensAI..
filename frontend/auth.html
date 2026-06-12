@@ -101,6 +101,7 @@
             font-size: 32px;
             font-weight: 800;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 8px;
@@ -281,14 +282,34 @@
 
         function getApiUrl(path) {
             const saved = localStorage.getItem("backend_url");
-            if (saved) return saved + path;
+            const normalized = saved ? saved.replace(/\/$/, "") : "";
+
+            // If user configured backend URL, always use it.
+            if (normalized) return normalized + path;
+
+            // Local dev fallback
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 return "http://127.0.0.1:5000" + path;
             }
-            return path;
+
+            // Production fallback: point directly to the deployed Flask backend.
+            // Update this if your Render/backend base URL is different.
+            const prodBase = "https://careerlensai-q5xk.onrender.com";
+            return prodBase + path;
+        }
+
+        function ensureBackendConfigured() {
+            const apiBase = getApiUrl("").replace(/\/$/, "");
+            if (!apiBase) {
+                showMessage("Configure backend URL first (⚙️ Configure API Server).", true);
+                return false;
+            }
+            return true;
         }
 
         async function register() {
+            if (!ensureBackendConfigured()) return;
+
             let username = document.getElementById("username").value.trim();
             let password = document.getElementById("password").value;
 
@@ -298,13 +319,18 @@
             }
 
             try {
-                let response = await fetch(getApiUrl("/register"), {
+                const url = getApiUrl("/register");
+                let response = await fetch(url, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username, password })
                 });
 
-                let data = await response.json();
+                // Always read response text first; backend may return non-JSON on error
+                const raw = await response.text();
+                let data = {};
+                try { data = raw ? JSON.parse(raw) : {}; } catch (e) {}
+
                 if (response.ok) {
                     showMessage("Registration successful! Logging in...", false);
                     localStorage.setItem("username", username);
@@ -312,7 +338,7 @@
                         window.location.href = "index.html";
                     }, 1500);
                 } else {
-                    showMessage(data.message || "Registration failed.", true);
+                    showMessage(data.message || raw || `Registration failed (HTTP ${response.status}).`, true);
                 }
             } catch (err) {
                 console.error(err);
@@ -320,7 +346,10 @@
             }
         }
 
+
         async function login() {
+            if (!ensureBackendConfigured()) return;
+
             let username = document.getElementById("username").value.trim();
             let password = document.getElementById("password").value;
 
@@ -330,13 +359,17 @@
             }
 
             try {
-                let response = await fetch(getApiUrl("/login"), {
+                const url = getApiUrl("/login");
+                let response = await fetch(url, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username, password })
                 });
 
-                let data = await response.json();
+                const raw = await response.text();
+                let data = {};
+                try { data = raw ? JSON.parse(raw) : {}; } catch (e) {}
+
                 if (response.ok) {
                     showMessage("Login successful! Redirecting...", false);
                     localStorage.setItem("username", data.username || username);
@@ -344,13 +377,14 @@
                         window.location.href = "index.html";
                     }, 1000);
                 } else {
-                    showMessage(data.message || "Invalid username or password.", true);
+                    showMessage(data.message || raw || `Login failed (HTTP ${response.status}).`, true);
                 }
             } catch (err) {
                 console.error(err);
                 showMessage("Connection error. Is backend running?", true);
             }
         }
+
 
         // Allow hitting Enter to submit
         document.querySelectorAll('input').forEach(input => {

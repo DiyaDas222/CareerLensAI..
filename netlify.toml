@@ -1,3 +1,61 @@
 [build]
   publish = "frontend"
   command = ""
+
+# Fix Netlify "Page not found"
+# Explicit entrypoints
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/auth"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/auth/"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/auth.html"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+# Route common auth URLs explicitly (prevents Netlify 404 on direct visits)
+[[redirects]]
+  from = "/login"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login/"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/register"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/register/"
+  to = "/auth.html"
+  status = 200
+  force = true
+
+# Default SPA fallback: serve frontend/index.html for any unknown route
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true

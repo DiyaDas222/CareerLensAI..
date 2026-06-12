@@ -1,9 +1,16 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from flask import make_response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv
-from groq import Groq
+try:
+    from dotenv import load_dotenv
+except Exception:
+    load_dotenv = None
+try:
+    from groq import Groq
+except Exception:
+    Groq = None
 from io import BytesIO
 import json
 import os
@@ -17,10 +24,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 
-load_dotenv()
+if load_dotenv:
+    load_dotenv()
+
+APP_VERSION = os.getenv("APP_VERSION", "2")
 
 app = Flask(__name__)
-CORS(app)
+# Allow CORS for deployed frontend calls.
+# For production you should restrict origins, but this unblocks the current issue.
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecretkey")
 
@@ -31,7 +43,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 # Groq client is optional: app must still work without an API key
 _groq_key = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=_groq_key) if _groq_key else None
+client = Groq(api_key=_groq_key) if (_groq_key and Groq) else None
 
 
 
@@ -54,9 +66,16 @@ class ResumeReport(db.Model):
 with app.app_context():
     try:
         db.create_all()
-        # Verify columns exist
-        db.session.query(ResumeReport.target_career).first()
     except Exception:
+        db.session.rollback()
+        db.drop_all()
+        db.create_all()
+
+    # Ensure columns exist without dropping the entire database
+    try:
+        db.session.query(User.username).first()
+    except Exception:
+        # If User table/columns are corrupted, reset DB schema
         db.session.rollback()
         db.drop_all()
         db.create_all()
@@ -300,6 +319,11 @@ JSON Schema:
 
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "version": APP_VERSION}), 200
+
+
 @app.route("/upload", methods=["POST"])
 def upload_resume():
     try:
@@ -391,8 +415,9 @@ def upload_resume():
 
     except Exception as e:
         import traceback
+        tb = traceback.format_exc()
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "exception_type": type(e).__name__, "trace": tb.splitlines()[-5:]}), 500
 
 
 @app.route("/history", methods=["GET"])

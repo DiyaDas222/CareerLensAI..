@@ -58,6 +58,7 @@
             font-size: 24px;
             font-weight: 800;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 30px;
@@ -1178,12 +1179,19 @@
 
     <script>
         function getApiUrl(path) {
-            // Force Production backend base to avoid stale/incorrect localStorage values.
-            // If deployed elsewhere, update this single constant.
-            const prodBase = "https://careerlensai-q5xk.onrender.com";
+            const saved = localStorage.getItem("backend_url");
+            const normalized = saved ? saved.replace(/\/$/, "") : "";
+
+            // If user configured backend URL, always use it (fixes login/upload calls after redirect).
+            if (normalized) return normalized + path;
+
+            // Local dev fallback
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 return "http://127.0.0.1:5000" + path;
             }
+
+            // Production fallback (edit if your backend base changes)
+            const prodBase = "https://careerlensai-q5xk.onrender.com";
             return prodBase + path;
         }
 
@@ -1332,17 +1340,44 @@
             formData.append("target_career", targetCareer);
             formData.append("username", username);
 
+            // Forcefully use user-configured backend_url if present.
+            // If not configured, use the current getApiUrl() logic.
+            const configuredBase = localStorage.getItem("backend_url")
+                ? localStorage.getItem("backend_url").replace(/\/$/, "")
+                : "";
+
+            const baseForCalls = configuredBase || getApiUrl("").replace(/\/$/, "");
+
             try {
-                const response = await fetch(getApiUrl("/upload"), {
+            // Health check first so we can show a better error than generic “connection failed”.
+            const healthRes = await fetch(baseForCalls + "/health", { method: "GET" }).catch(() => null);
+            if (!healthRes || !healthRes.ok) {
+                    showLoading(false);
+                    let healthText = "";
+                    try { healthText = healthRes ? await healthRes.text() : ""; } catch(e) {}
+                    alert(`Backend health failed (HTTP ${healthRes ? healthRes.status : "N/A"}). ${healthText || "Check Render logs / service status."}`);
+                    return;
+                }
+
+                const response = await fetch(baseForCalls + "/upload", {
                     method: "POST",
-                    body: formData
+                    body: formData,
+                    // Some hosts require explicit CORS handling; keep it simple here.
+                    mode: "cors"
                 });
 
-                const data = await response.json();
+                let data = null;
+                let rawText = "";
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    try { rawText = await response.text(); } catch (e2) {}
+                }
                 showLoading(false);
 
                 if (!response.ok) {
-                    alert(data.error || "Upload analysis failed.");
+                    const errMsg = data?.error || rawText || `HTTP ${response.status}`;
+                    alert(`Upload failed: ${errMsg}`);
                     return;
                 }
 
@@ -1869,3 +1904,4 @@
     </script>
 </body>
 </html>
+
