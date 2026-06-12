@@ -1178,12 +1178,13 @@
 
     <script>
         function getApiUrl(path) {
-            const saved = localStorage.getItem("backend_url");
-            if (saved) return saved + path;
+            // Force Production backend base to avoid stale/incorrect localStorage values.
+            // If deployed elsewhere, update this single constant.
+            const prodBase = "https://careerlensai-q5xk.onrender.com";
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 return "http://127.0.0.1:5000" + path;
             }
-            return path;
+            return prodBase + path;
         }
 
         function saveBackendUrl(url) {

@@ -29,7 +29,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "d
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Groq client is optional: app must still work without an API key
+_groq_key = os.getenv("GROQ_API_KEY")
+client = Groq(api_key=_groq_key) if _groq_key else None
+
 
 
 class User(db.Model):
@@ -170,6 +173,63 @@ def analyze_resume_locally(text: str) -> dict:
 
 
 def generate_ai_feedback(text: str, target_career: str) -> str:
+    # If GROQ is not configured, return a valid JSON payload so the frontend works.
+    if not client:
+        local = analyze_resume_locally(text)
+        fallback = {
+            "ats_score": local["score"],
+            "career_match_score": 55,
+            "placement_readiness_score": 50,
+            "strengths": [
+                "Resume text was extracted successfully.",
+                "Some relevant skills/keywords were detected.",
+                "Overall structure looks readable for ATS.".replace(".", ".")
+            ],
+            "weaknesses": [
+                "AI career-specific analysis is unavailable because GROQ_API_KEY is not set.",
+                "Add clearer job-relevant keywords and quantified impact.",
+                "Ensure sections like Projects and Skills are explicitly labeled."
+            ],
+            "suggestions": [
+                "Set GROQ_API_KEY in the backend environment to enable full AI analysis.",
+                "Customize your resume for the target career using job-relevant keywords.",
+                "Quantify achievements (percentages, metrics, outcomes)."
+            ],
+            "skills_found": local.get("skills", []),
+            "missing_skills": ["Role-specific tools/technologies vary by target career"],
+            "skills_to_improve": ["Tailor Skills section to {target_career}".format(target_career=target_career)],
+            "hr_questions": ["Tell me about yourself.", "Why are you interested in this role?", "What is your biggest achievement?"] ,
+            "technical_questions": ["Explain a project you built.", "How do you debug a challenging issue?", "What trade-offs do you consider in system design?"] ,
+            "project_viva_questions": ["What technologies did you use and why?", "What challenges did you face?", "How did you measure success?"],
+            "recommended_projects": [
+                {
+                    "title": "Target-Career Capstone",
+                    "description": "Build a small end-to-end project aligned to {target_career}, document your decisions, and publish the repo.".format(target_career=target_career)
+                }
+            ],
+            "career_roadmap": [
+                "Step 1: Strengthen fundamentals aligned with {target_career}".format(target_career=target_career),
+                "Step 2: Build 2-3 job-relevant projects and document impact",
+                "Step 3: Practice interviews and optimize your resume" 
+            ],
+            "career_advice": ["Start with keywords + projects, then iterate based on ATS results.", "Keep bullets action-oriented and metric-backed.", "Align each project to a job requirement."],
+            "resume_rewrite": [],
+            "weekly_study_planner": {
+                "Monday": "Resume keyword tailoring + ATS checks",
+                "Tuesday": "Data structures / fundamentals",
+                "Wednesday": "Build a job-relevant project",
+                "Thursday": "Practice system/technical questions",
+                "Friday": "Quantify outcomes + rewrite bullets",
+                "Saturday": "Mock interview",
+                "Sunday": "Review & plan next week"
+            },
+            "learning_resource_recommendations": [
+                {"resource_type": "Practice Platforms", "title": "LeetCode / DSA practice", "link": "https://leetcode.com"},
+                {"resource_type": "Documentation", "title": "MDN Web Docs / Tech fundamentals", "link": "https://developer.mozilla.org"}
+            ]
+        }
+        return json.dumps(fallback)
+
     prompt = f"""
 You are an expert career coach, ATS expert, and hiring manager.
 Analyze the following resume specifically for the target career of "{target_career}".
@@ -239,6 +299,7 @@ JSON Schema:
     return completion.choices[0].message.content
 
 
+
 @app.route("/upload", methods=["POST"])
 def upload_resume():
     try:
@@ -277,8 +338,31 @@ def upload_resume():
             return jsonify({"error": "Could not extract any text from the file. Try a clearer image or PDF."}), 422
 
         local_analysis = analyze_resume_locally(text)
-        ai_feedback_str = generate_ai_feedback(text, target_career)
-        
+        try:
+            ai_feedback_str = generate_ai_feedback(text, target_career)
+        except Exception:
+            # Hard fallback so frontend never gets a 500 when GROQ fails
+            ai_feedback_str = json.dumps({
+                "ats_score": local_analysis["score"],
+                "career_match_score": 55,
+                "placement_readiness_score": 50,
+                "strengths": ["Resume text extracted successfully."],
+                "weaknesses": ["AI analysis failed; using local heuristic."],
+                "suggestions": local_analysis.get("suggestions", []),
+                "skills_found": local_analysis.get("skills", []),
+                "missing_skills": ["Review role requirements"],
+                "skills_to_improve": ["Customize skills to target role"],
+                "hr_questions": [],
+                "technical_questions": [],
+                "project_viva_questions": [],
+                "recommended_projects": [],
+                "career_roadmap": [],
+                "career_advice": [],
+                "resume_rewrite": [],
+                "weekly_study_planner": {},
+                "learning_resource_recommendations": []
+            })
+
         # Verify if feedback is valid JSON
         try:
             ai_data = json.loads(ai_feedback_str)
@@ -287,6 +371,7 @@ def upload_resume():
         except Exception:
             # Fallback
             score = local_analysis["score"]
+
 
         report = ResumeReport(
             username=username,
