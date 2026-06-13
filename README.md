@@ -1,133 +1,288 @@
-# CareerLens AI (Placement Dashboard)
+# CareerLens AI 🚀
 
-CareerLens AI helps candidates upload a resume and receive ATS-style scoring, role-specific feedback, interview questions, and a tailored learning roadmap. It also supports generating a cover letter and auditing LinkedIn text.
+CareerLens AI is an AI-powered Placement Dashboard that helps students and job seekers analyze their resumes, improve their professional profiles, and prepare for interviews.
 
-> **Frontend:** static HTML (Netlify)
->
-> **Backend:** Flask API (uploads, history, PDF report download, AI analysis)
+🌐 **Live Demo:** https://rococo-raindrop-a7e917.netlify.app
 
 ---
 
-## Features
+## 📌 Features
 
-- **Resume upload & analysis** (PDF + image files)
-- **ATS score + career match score + placement readiness**
-- **Strengths, weaknesses, and targeted suggestions**
-- **Skill gap analysis**
-- **Interview prep** (HR/technical/project viva questions + answer evaluation)
-- **Advanced tools**
-  - Generate a tailored **cover letter** (from your last analysis)
-  - **LinkedIn profile optimizer** (headline + About + checklist)
-- **History** (saved reports per username)
-- **Download PDF report**
+### Resume Analysis
+
+* Upload PDF resumes
+* Upload image-based resumes (PNG, JPG, JPEG)
+* ATS-style Resume Scoring
+* Career Match Analysis
+* Placement Readiness Score
+* Strengths & Weaknesses Detection
+* Personalized Improvement Suggestions
+* Skill Gap Analysis
+
+### Interview Preparation
+
+* HR Interview Questions
+* Technical Interview Questions
+* Project Viva Questions
+* Mock Answer Evaluation
+* Performance Feedback
+
+### Career Development Tools
+
+* AI-Generated Cover Letter
+* LinkedIn Profile Optimizer
+* Professional Headline Suggestions
+* About Section Enhancement
+* LinkedIn Improvement Checklist
+
+### Report Management
+
+* User Authentication
+* Analysis History Tracking
+* Downloadable PDF Reports
+* Saved Resume Records
 
 ---
 
-## Project Structure
+## 🛠️ Tech Stack
 
-- `frontend/` - static UI (`index.html`, `auth.html`)
-- `backend/` - Flask app (`app.py`), database (`database.db`), uploads folder
-- `netlify.toml` - Netlify redirects for direct route access
+### Frontend
+
+* HTML5
+* CSS3
+* JavaScript
+* Chart.js
+* Netlify Deployment
+
+### Backend
+
+* Python
+* Flask
+* Flask-CORS
+* Flask-SQLAlchemy
+* SQLite Database
+
+### AI & Processing
+
+* GROQ API
+* PyPDF2
+* pdfplumber
+* python-docx
+* pytesseract
+* OpenCV
+* Pillow
+
+### Report Generation
+
+* ReportLab
 
 ---
 
-## Live Demo / Deployment
+## 📂 Project Structure
 
-This project is configured for Netlify to publish the `frontend/` directory, and a separate Flask deployment (the UI expects a backend URL).
-
-### Backend URL
-- The UI uses `localStorage.backend_url` if configured.
-- Otherwise it falls back to local dev (`http://127.0.0.1:5000`) and a production Render base URL.
-
-In the UI: **Auth → ⚙️ Configure API Server**.
+```text
+CareerLens-AI/
+│
+├── frontend/
+│   ├── index.html
+│   ├── auth.html
+│   ├── style.css
+│   └── script.js
+│
+├── backend/
+│   ├── app.py
+│   ├── database.db
+│   ├── uploads/
+│   └── requirements.txt
+│
+├── netlify.toml
+├── README.md
+└── LICENSE
+```
 
 ---
 
-## Backend Setup (Flask)
+## 🚀 Live Demo
 
-### 1) Create a virtual environment
+Frontend:
+https://rococo-raindrop-a7e917.netlify.app
+
+---
+
+## ⚙️ Backend Setup
+
+### 1. Clone Repository
+
+```bash
+git clone YOUR_GITHUB_REPOSITORY_URL
+cd CareerLens-AI
+```
+
+### 2. Create Virtual Environment
 
 ```bash
 cd backend
 python -m venv venv
+```
+
+### 3. Activate Virtual Environment
+
+Windows:
+
+```bash
 venv\Scripts\activate
 ```
 
-### 2) Install dependencies
+Mac/Linux:
+
+```bash
+source venv/bin/activate
+```
+
+### 4. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3) (Optional) Configure GROQ API key
-
-The backend can run without an AI key by using a local heuristic fallback.
+### 5. Configure AI API (Optional)
 
 ```bash
-set GROQ_API_KEY=YOUR_KEY
+set GROQ_API_KEY=YOUR_API_KEY
 ```
 
-### 4) Run the server
+### 6. Run Server
 
 ```bash
 python app.py
 ```
 
-Backend should be reachable at:
+Backend runs on:
 
-- `GET  /health`
-- `POST /register`
-- `POST /login`
-- `POST /upload`
-- `GET  /history?username=...`
-- `GET  /download-report?report_id=...&username=...`
-- `POST /generate-cover-letter`
-- `POST /analyze-linkedin`
-- `POST /evaluate-mock-answer`
+```text
+http://127.0.0.1:5000
+```
 
 ---
 
-## Frontend Setup
+## 🔌 API Endpoints
 
-The frontend is static. If running locally:
+### Health Check
 
-1. Deploy or serve `frontend/index.html` and `frontend/auth.html`.
-2. Configure the backend URL in the Auth screen (or run backend locally on port `5000`).
+```http
+GET /health
+```
+
+### User Registration
+
+```http
+POST /register
+```
+
+### User Login
+
+```http
+POST /login
+```
+
+### Resume Upload
+
+```http
+POST /upload
+```
+
+### Analysis History
+
+```http
+GET /history?username=user
+```
+
+### Download Report
+
+```http
+GET /download-report
+```
+
+### Generate Cover Letter
+
+```http
+POST /generate-cover-letter
+```
+
+### LinkedIn Analysis
+
+```http
+POST /analyze-linkedin
+```
+
+### Mock Interview Evaluation
+
+```http
+POST /evaluate-mock-answer
+```
 
 ---
 
-## API Quick Reference
+## 📄 Sample Workflow
 
-### `POST /upload`
-
-**FormData**:
-- `resume` (file) - PDF or PNG/JPG/JPEG
-- `target_career` (string) - role to tailor insights for
-- `username` (string) - used for history storage
-
-**Response:** JSON containing:
-- `id`, `score`
-- `local_analysis` (heuristic)
-- `ai_feedback` (JSON string)
-
-### `GET /download-report`
-
-Query params:
-- `report_id` (optional)
-- `username` (optional, default `demo_user`)
-
-Returns: a generated PDF report for the last (or specified) analysis.
+1. Register/Login
+2. Upload Resume
+3. Select Target Career Role
+4. Get ATS Score
+5. Review Skill Gap Analysis
+6. Generate Cover Letter
+7. Optimize LinkedIn Profile
+8. Practice Interview Questions
+9. Download PDF Report
 
 ---
 
-## Notes / Requirements
+## 💡 Key Benefits
 
-- **OCR for images** uses `pytesseract`. If you upload images and OCR can’t run (missing system dependency), the backend will return a clear error suggesting to upload a clearer/text-based PDF.
-- **AI mode:** set `GROQ_API_KEY` to enable full AI analysis. Without it, the app still works using a local heuristic.
+* Improves Resume Quality
+* Increases ATS Compatibility
+* Helps Prepare for Interviews
+* Identifies Missing Skills
+* Creates Professional Cover Letters
+* Enhances LinkedIn Profiles
+* Tracks Career Progress
 
 ---
 
-## License
+## 🔒 Notes
 
-No license file is included in this repository. Add one if you plan to publish publicly.
+* OCR support available for image resumes.
+* PDF reports generated automatically.
+* Works with or without GROQ API.
+* Local heuristic analysis available as fallback.
 
+---
+
+## 📈 Future Enhancements
+
+* Multi-language Resume Analysis
+* AI Resume Builder
+* Job Recommendation Engine
+* Real-time Interview Simulator
+* Resume Ranking System
+* Company-specific Interview Preparation
+
+---
+
+## 👩‍💻 Developer
+
+**Diya Das**
+
+B.Tech CSE Student | AI & Full Stack Developer
+
+GitHub: DiyaDas222
+
+LinkedIn: https://www.linkedin.com/in/diya-das-33b968302
+
+---
+
+## ⭐ Support
+
+If you found this project useful, please give it a star on GitHub and share it with others.
+
+⭐ Star this repository to support the project.
