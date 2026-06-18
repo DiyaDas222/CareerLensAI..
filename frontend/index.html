@@ -1409,9 +1409,13 @@
             document.getElementById("roadmapDataContainer").style.display = "grid";
 
             // Parse AI feedback
+            // Supports both payload shapes:
+            // - /upload: { ai_feedback: "{...json...}", local_analysis: {...} }
+            // - /history: { feedback: "{...json...}" }
             let aiData = {};
+            const feedbackStr = data.ai_feedback ?? data.feedback;
             try {
-                aiData = JSON.parse(data.ai_feedback);
+                aiData = JSON.parse(feedbackStr);
             } catch (err) {
                 console.error("AI JSON parsing failed. Displaying fallback format.", err);
                 // Fail-safe default schema
