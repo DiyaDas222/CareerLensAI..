@@ -137,23 +137,77 @@ def extract_text_from_image(path: str) -> str:
         return ""
 
 
-def analyze_resume_locally(text: str) -> dict:
-    # Rule-based fallback/hybrid analyzer
-    score = 40  # Base score for uploading any readable resume
+def analyze_resume_locally(text: str, target_career: str = "") -> dict:
+    # Rule-based fallback/hybrid analyzer enhanced to be role-aware
+    base_score = 40  # Base score for uploading any readable resume
     skills_found = []
     suggestions = []
 
-    keywords = [
-        "python", "java", "c++", "flask", "django", "react", "sql", 
+    # Generic keywords (help identify basic technical maturity)
+    generic_keywords = [
+        "python", "java", "c++", "flask", "django", "react", "sql",
         "machine learning", "ai", "html", "css", "javascript", "node",
         "aws", "docker", "kubernetes", "git", "linux", "c#", "data structures"
     ]
 
-    for keyword in keywords:
-        if keyword.lower() in text.lower():
+    # Role-specific keywords mapping (extendable)
+    role_keywords = {
+        "software engineer": ["python", "java", "c++", "git", "testing", "ci/cd", "algorithms", "data structures"],
+        "frontend": ["react", "vue", "angular", "javascript", "html", "css", "webpack", "accessibility"],
+        "frontend developer": ["react", "vue", "angular", "javascript", "html", "css", "webpack", "accessibility"],
+        "data scientist": ["python", "pandas", "numpy", "scikit-learn", "machine learning", "statistics", "model", "jupyter"],
+        "data analyst": ["sql", "excel", "tableau", "power bi", "pandas", "visualization"],
+        "devops": ["docker", "kubernetes", "terraform", "ci/cd", "aws", "monitoring", "ansible"],
+        "devops engineer": ["docker", "kubernetes", "terraform", "ci/cd", "aws", "monitoring", "ansible"],
+        "machine learning engineer": ["tensorflow", "pytorch", "model", "training", "inference", "machine learning"],
+        "product manager": ["roadmap", "stakeholder", "gathered requirements", "prioritized", "product", "metrics"],
+    }
+
+    text_lower = text.lower()
+
+    score = base_score
+
+    # Check generic keywords
+    for keyword in generic_keywords:
+        if keyword in text_lower:
             score += 3
             skills_found.append(keyword)
 
+    # Check role-specific keywords and compute career match
+    career = (target_career or "").lower()
+    role_kw_list = []
+    if career:
+        # find the best matching role key by simple substring match
+        for role_key in role_keywords.keys():
+            if role_key in career:
+                role_kw_list = role_keywords[role_key]
+                break
+    # If no direct match, try to fallback by token matching
+    if not role_kw_list and career:
+        for role_key, kws in role_keywords.items():
+            for token in career.split():
+                if token in role_key:
+                    role_kw_list = kws
+                    break
+            if role_kw_list:
+                break
+
+    role_hits = 0
+    if role_kw_list:
+        for rk in role_kw_list:
+            if rk in text_lower:
+                role_hits += 1
+                if rk not in skills_found:
+                    skills_found.append(rk)
+                score += 4  # give a slightly larger boost for role-aligned keywords
+
+    # Determine career_match_score as percent of matched role keywords
+    if role_kw_list:
+        career_match_score = int(min(100, (role_hits / max(1, len(role_kw_list))) * 100))
+    else:
+        career_match_score = 50
+
+    # Length and detail heuristics
     word_count = len(text.split())
     if word_count > 300:
         score += 5
@@ -163,42 +217,42 @@ def analyze_resume_locally(text: str) -> dict:
     action_verbs = ["developed", "built", "created", "designed", "implemented", "optimized", "managed", "led"]
     verb_hits = 0
     for verb in action_verbs:
-        if verb in text.lower():
+        if verb in text_lower:
             verb_hits += 1
             score += 1
     if verb_hits < 3:
         suggestions.append("Use more action verbs (e.g., 'developed', 'optimized') to describe achievements.")
 
-    if "project" in text.lower():
+    if "project" in text_lower:
         score += 5
     else:
         suggestions.append("Add a dedicated 'Projects' section to show practical application.")
 
-    if "github" in text.lower() or "gitlab" in text.lower() or "bitbucket" in text.lower():
+    if "github" in text_lower or "gitlab" in text_lower or "bitbucket" in text_lower:
         score += 5
     else:
         suggestions.append("Include links to your GitHub profile or project portfolio.")
 
-    if "certif" in text.lower():
+    if "certif" in text_lower:
         score += 3
 
-    if "%" in text or "increase" in text.lower() or "reduced" in text.lower() or "saved" in text.lower():
+    if "%" in text_lower or "increase" in text_lower or "reduced" in text_lower or "saved" in text_lower:
         score += 5
     else:
         suggestions.append("Quantify your results (e.g., 'improved page load times by 20%').")
 
-    score = min(score, 100)
-    return {"score": score, "skills": skills_found, "suggestions": suggestions}
+    score = min(max(int(score), 0), 100)
+    return {"score": score, "skills": skills_found, "suggestions": suggestions, "career_match_score": career_match_score}
 
 
 def generate_ai_feedback(text: str, target_career: str) -> str:
     # If GROQ is not configured, return a valid JSON payload so the frontend works.
     if not client:
-        local = analyze_resume_locally(text)
+        local = analyze_resume_locally(text, target_career)
         fallback = {
             "ats_score": local["score"],
-            "career_match_score": 55,
-            "placement_readiness_score": 50,
+            "career_match_score": local.get("career_match_score", 50),
+            "placement_readiness_score": min(100, int(local.get("score", 0) + 5)),
             "strengths": [
                 "Resume text was extracted successfully.",
                 "Some relevant skills/keywords were detected.",
@@ -319,11 +373,11 @@ JSON Schema:
         return completion.choices[0].message.content
     except Exception:
         # If client is misconfigured at runtime, fallback to local heuristic
-        local = analyze_resume_locally(text)
+        local = analyze_resume_locally(text, target_career)
         fallback = {
             "ats_score": local["score"],
-            "career_match_score": 55,
-            "placement_readiness_score": 50,
+            "career_match_score": local.get("career_match_score", 50),
+            "placement_readiness_score": min(100, int(local.get("score", 0) + 5)),
             "strengths": ["Resume text was extracted successfully."],
             "weaknesses": ["AI analysis failed; using local heuristic."],
             "suggestions": local.get("suggestions", []),
@@ -375,15 +429,15 @@ def upload_resume():
         if not text.strip():
             return jsonify({"error": "Could not extract any text from the file. Try a clearer image or PDF."}), 422
 
-        local_analysis = analyze_resume_locally(text)
+        local_analysis = analyze_resume_locally(text, target_career)
         try:
             ai_feedback_str = generate_ai_feedback(text, target_career)
         except Exception:
             # Hard fallback so frontend never gets a 500 when GROQ fails
             ai_feedback_str = json.dumps({
                 "ats_score": local_analysis["score"],
-                "career_match_score": 55,
-                "placement_readiness_score": 50,
+                "career_match_score": local_analysis.get("career_match_score", 50),
+                "placement_readiness_score": min(100, int(local_analysis.get("score", 0) + 5)),
                 "strengths": ["Resume text extracted successfully."],
                 "weaknesses": ["AI analysis failed; using local heuristic."],
                 "suggestions": local_analysis.get("suggestions", []),
