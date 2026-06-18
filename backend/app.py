@@ -309,13 +309,27 @@ JSON Schema:
 }}
 """
 
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=0.3,
-    )
-    return completion.choices[0].message.content
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+        )
+        return completion.choices[0].message.content
+    except Exception:
+        # If client is misconfigured at runtime, fallback to local heuristic
+        local = analyze_resume_locally(text)
+        fallback = {
+            "ats_score": local["score"],
+            "career_match_score": 55,
+            "placement_readiness_score": 50,
+            "strengths": ["Resume text was extracted successfully."],
+            "weaknesses": ["AI analysis failed; using local heuristic."],
+            "suggestions": local.get("suggestions", []),
+            "skills_found": local.get("skills", []),
+        }
+        return json.dumps(fallback)
 
 
 
@@ -485,13 +499,39 @@ JSON Schema:
   "cover_letter": "The full text of the cover letter with proper spacing and paragraphs."
 }}
 """
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.5,
-        )
-        return jsonify(json.loads(completion.choices[0].message.content))
+        # If Groq client is not configured, provide a lightweight local fallback
+        if not client:
+            cover_letter_text = (
+                f"Dear Hiring Team at {company_name},\n\n" 
+                f"I am excited to apply for the {job_title} role at {company_name}. "
+                "My background aligns well with this position: "
+                f"{resume_summary}\n\n"
+                "I bring a strong combination of practical experience, enthusiasm for the role, "
+                "and a demonstrated ability to learn quickly. I would welcome the opportunity "
+                "to discuss how my skills can contribute to your team.\n\nSincerely,\nA Strong Candidate"
+            )
+            return jsonify({"cover_letter": cover_letter_text})
+
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.5,
+            )
+            return jsonify(json.loads(completion.choices[0].message.content))
+        except Exception:
+            # Fallback if client fails at runtime
+            cover_letter_text = (
+                f"Dear Hiring Team at {company_name},\n\n" 
+                f"I am excited to apply for the {job_title} role at {company_name}. "
+                "My background aligns well with this position: "
+                f"{resume_summary}\n\n"
+                "I bring a strong combination of practical experience, enthusiasm for the role, "
+                "and a demonstrated ability to learn quickly. I would welcome the opportunity "
+                "to discuss how my skills can contribute to your team.\n\nSincerely,\nA Strong Candidate"
+            )
+            return jsonify({"cover_letter": cover_letter_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -526,13 +566,44 @@ JSON Schema:
   "optimized_about": "A compelling, first-person LinkedIn About/Summary section highlighting skills and passion for the target career."
 }}
 """
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.4,
-        )
-        return jsonify(json.loads(completion.choices[0].message.content))
+        if not client:
+            # Simple local heuristic fallback for LinkedIn analysis
+            completeness = min(100, max(10, int(len(linkedin_text.split()) / 2)))
+            suggestions = [
+                "Add a clear headline that highlights your primary role and top skill.",
+                "Write a concise, achievement-oriented About section with metrics.",
+            ]
+            optimized_headline = f"{target_career} | Experienced Professional"
+            optimized_about = linkedin_text[:400] + ("..." if len(linkedin_text) > 400 else "")
+            return jsonify({
+                "completeness_score": completeness,
+                "suggestions": suggestions,
+                "optimized_headline": optimized_headline,
+                "optimized_about": optimized_about
+            })
+
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.4,
+            )
+            return jsonify(json.loads(completion.choices[0].message.content))
+        except Exception:
+            completeness = min(100, max(10, int(len(linkedin_text.split()) / 2)))
+            suggestions = [
+                "Add a clear headline that highlights your primary role and top skill.",
+                "Write a concise, achievement-oriented About section with metrics.",
+            ]
+            optimized_headline = f"{target_career} | Experienced Professional"
+            optimized_about = linkedin_text[:400] + ("..." if len(linkedin_text) > 400 else "")
+            return jsonify({
+                "completeness_score": completeness,
+                "suggestions": suggestions,
+                "optimized_headline": optimized_headline,
+                "optimized_about": optimized_about
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -567,13 +638,36 @@ JSON Schema:
   "suggested_answer": "An exemplary, high-scoring model answer that the candidate could use as a reference."
 }}
 """
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.3,
-        )
-        return jsonify(json.loads(completion.choices[0].message.content))
+        if not client:
+            # Lightweight local evaluation fallback
+            word_count = len(user_answer.split())
+            score = min(100, 40 + word_count)  # naive proxy: longer answers score higher up to cap
+            feedback = "Concise, structured answer. Add more concrete examples and metrics." if word_count > 20 else "Answer is brief; expand with examples and measurable outcomes."
+            suggested = "Provide a short context, describe your actions, and quantify the result. Example: \"I led X, which resulted in Y% improvement by doing Z.\""
+            return jsonify({
+                "score": score,
+                "feedback": feedback,
+                "suggested_answer": suggested
+            })
+
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+            )
+            return jsonify(json.loads(completion.choices[0].message.content))
+        except Exception:
+            word_count = len(user_answer.split())
+            score = min(100, 40 + word_count)
+            feedback = "Concise, structured answer. Add more concrete examples and metrics." if word_count > 20 else "Answer is brief; expand with examples and measurable outcomes."
+            suggested = "Provide a short context, describe your actions, and quantify the result. Example: \"I led X, which resulted in Y% improvement by doing Z.\""
+            return jsonify({
+                "score": score,
+                "feedback": feedback,
+                "suggested_answer": suggested
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

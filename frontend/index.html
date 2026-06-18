@@ -1377,7 +1377,8 @@
 
                 if (!response.ok) {
                     const errMsg = data?.error || rawText || `HTTP ${response.status}`;
-                    alert(`Upload failed: ${errMsg}`);
+                    console.error("Upload failed:", errMsg);
+                    alert("Upload failed: server error. Check backend logs or try again later.");
                     return;
                 }
 
@@ -1409,9 +1410,13 @@
             document.getElementById("roadmapDataContainer").style.display = "grid";
 
             // Parse AI feedback
+            // Supports both payload shapes:
+            // - /upload: { ai_feedback: "{...json...}", local_analysis: {...} }
+            // - /history: { feedback: "{...json...}" }
             let aiData = {};
+            const feedbackStr = data.ai_feedback ?? data.feedback;
             try {
-                aiData = JSON.parse(data.ai_feedback);
+                aiData = JSON.parse(feedbackStr);
             } catch (err) {
                 console.error("AI JSON parsing failed. Displaying fallback format.", err);
                 // Fail-safe default schema
@@ -1718,7 +1723,8 @@
                 showLoading(false);
 
                 if (!response.ok) {
-                    alert(data.error || "Evaluation failed.");
+                    console.error("Evaluation failed:", data);
+                    alert("Evaluation failed: server error. Try again later.");
                     return;
                 }
 
@@ -1768,7 +1774,8 @@
                 showLoading(false);
 
                 if (!response.ok) {
-                    alert(data.error || "Cover letter draft failed.");
+                    console.error("Cover letter generation failed:", data);
+                    alert("Cover letter generation failed: server error. Try again later.");
                     return;
                 }
 
@@ -1814,7 +1821,8 @@
                 showLoading(false);
 
                 if (!response.ok) {
-                    alert(data.error || "LinkedIn audit failed.");
+                    console.error("LinkedIn audit failed:", data);
+                    alert("LinkedIn audit failed: server error. Try again later.");
                     return;
                 }
 
